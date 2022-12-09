@@ -31,6 +31,7 @@
             <div class="col-lg-3">
                 <div class="am-collapse am-topbar-collapse" id="topbar-collapse">
                     <div class="logininfo" style="text-align: right">
+                        <i class="bi bi-gear-fill" id="log"></i>
                         <span class="welcome">Welcome, <em>{{ session.username }}&nbsp;&nbsp;</em> </span>
                         <a href="{{ url_for('logout') }}" target="_top" style="color:#1c1c1c">Logout</a>
                     </div>
@@ -146,6 +147,12 @@
                 location = event.target.attributes["data-name"].value;
 
             window.location = window.location.pathname.replace(/\/+$/, "") + "/" + location;
+        });
+
+        document.getElementById("topbar-collapse")?.addEventListener("click", function (event) {
+            if (event.target.className == "bi bi-gear-fill"){
+                window.location = "/log"
+            }
         });
 
         document.getElementById("back-btn")?.addEventListener("click", function () {

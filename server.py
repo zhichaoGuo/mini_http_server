@@ -86,7 +86,7 @@ def view(element=""):
     if request.args.get("delete"):
         location = request.args.get("location")
         path = os.path.join(path, location)
-        logger.info('%s %s %s %s %s', session.get('username'), request.remote_addr, 'DELETE', path, 'OK')
+        logger.info('%s %s %s %s %s', session.get('username'), request.remote_addr, '【DELETE】', path, 'OK')
         if os.path.isdir(path):
             shutil.rmtree(path)
         else:
@@ -214,6 +214,14 @@ def register():
         return abort(405)
 
 
+@app.route('/log', methods=['GET'])
+@login_required
+def show_log():
+    if request.args.get("embed"):
+        return send_file(conf.log_path, as_attachment=False)
+    return render_template("file.template", element=get_element(conf.log_path))
+
+
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload():
@@ -236,7 +244,7 @@ def upload():
 
     filename = secure_filename(file.filename)
     file.save(os.path.join(path, filename))
-    logger.info('%s %s %s %s', session.get('username'),request.remote_addr, 'Upload', os.path.join(path, filename))
+    logger.info('%s %s %s %s', session.get('username'),request.remote_addr, '【Upload】', os.path.join(path, filename))
     return {"status": True}
 
 
