@@ -17,11 +17,37 @@
 </head>
 <body>
 {% block body %}
-    <div class="container py-2">
+    <div class="container px-4 py-2">
         <!-- Header -->
         <header>
-            <div class="p-2 mx-auto text-center text-break" style="max-width: 85%">
-                <h1 class="display-5 fw-bold">{{ element.name }}</h1>
+        <div class="row mb-2 justify-content-around text-center">
+            <div class="col-lg-3">
+            </div>
+            <div class="col-lg-6">
+                <div class="p-2 mx-auto text-center text-break" style="max-width: 85%">
+                    <h1 class="display-5 fw-bold">{{ element.name }}</h1>
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <div class="am-collapse am-topbar-collapse" id="topbar-collapse">
+                    <div class="logininfo" style="text-align: right">
+                        <span class="welcome">Welcome, <em>{{ session.username }}&nbsp;&nbsp;</em> </span>
+                        <a href="{{ url_for('logout') }}" target="_top" style="color:#1c1c1c">Logout</a>
+                    </div>
+                </div>
+                <div class="p-2 mx-auto text-center text-break" style="max-width: 85%">
+                 <div aria-live="polite" aria-atomic="true" class="d-flex justify-content-center align-items-center w-100">
+                    <div id="liveToast" class="toast align-items-center" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                            已复制链接.
+                            </div>
+                        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
             </div>
             <div class="d-flex flex-row flex-wrap justify-content-center align-items-center pb-2 mb-4 border-bottom">
                     <button id="back-btn" title="Back" class="{{ "d-none d-lg-block" if element.isroot else "" }} order-3 order-lg-1 btn btn-light mt-2 mt-lg-0 me-4 me-lg-1 fs-4" style="border-radius: 2rem; border-color: black; {{ "visibility: hidden;" if element.isroot else "" }}">
@@ -97,6 +123,23 @@
 
         document.getElementById("directory-list")?.addEventListener("click", function (event) {
             let location;
+            if (event.target.className == "bi bi-share"){
+                location = event.target.parentElement.parentElement.attributes["data-name"].value;
+                var oInput = document.createElement("input");
+                oInput.value = "http://fm.htek.com" + window.location.pathname.replace(/\/+$/, "") + "/" + location;
+                document.body.appendChild(oInput);
+                oInput.select(); // 选择对象
+                document.execCommand("Copy"); // 执行浏览器复制命令
+                oInput.className = "oInput";
+                oInput.style.display = "none";
+                var toastLiveExample = document.getElementById('liveToast');
+                var toast = new bootstrap.Toast(toastLiveExample);
+                toast.show();
+                return ;}
+            else if ((event.target.className == "bi bi-folder-x")||(event.target.className == "bi bi-trash")){
+                location = event.target.parentElement.parentElement.attributes["data-name"].value;
+                window.location = window.location.pathname.replace(/\/+$/, "") + "?delete=true&location=" + location
+                return ;}
             if (event.target.parentElement instanceof HTMLLIElement)
                 location = event.target.parentElement.attributes["data-name"].value;
             else

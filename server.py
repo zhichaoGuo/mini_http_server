@@ -1,29 +1,82 @@
 import os
 import logging
 import secrets
+import shutil
 import tarfile
 import zipfile
 import datetime
 import mimetypes
+from logging.handlers import TimedRotatingFileHandler
 
 import humanize
-from flask import Flask, render_template, abort, request, session, send_file
+from flask import render_template, abort, request, session, send_file, redirect, url_for, jsonify, Flask
+from flask_login import login_required, logout_user, login_user, LoginManager
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import FlaskForm
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from wtforms import StringField, PasswordField, validators, Form
+
+from http_server.config import Config
 
 app = Flask(__name__)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Strict',
 )
-
+conf = Config()
+# -------------  setting logger   -----------------
 logger = logging.getLogger("http.server")
 logger.setLevel(logging.WARNING)
+formatter = logging.Formatter("[%(asctime)s][%(module)s:%(lineno)d][%(levelname)s][%(thread)d] - %(message)s")
+handler = TimedRotatingFileHandler("./log/flask.log", when="D", interval=1, backupCount=15, encoding="UTF-8",
+                                   delay=False, utc=True)
+
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+app.secret_key = 'Htek20180905'
+
+# -------------  setting database  -----------------
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:HtekRPS2017@127.0.0.1:3306/http'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+db = SQLAlchemy(app)
+ctx = app.app_context()
+ctx.push()
+db.create_all()
+
+# -------------  setting login   -----------------
+loginManager = LoginManager(app)
+loginManager.session_protection = "strong"
+loginManager.login_view = 'login'
+
+
+@loginManager.user_loader
+def load_user(user_id):
+    db.create_all()
+    new = datetime.datetime.now()
+    username = str(User.query.get(int(user_id)))
+    user = User.query.filter_by(username=username).first()
+    if user:
+        old = user.last_login_time
+        # 登录超时 3600s -> 1h
+        if (new - old).seconds > 3600:
+            user.is_login = False
+            db.session.add(user)
+            db.session.commit()
+            session.clear()
+            logout_user()
+            app.logger.info('%s online time out, auto logout,last login time is:%s' % (username, old))
+            return None
+        return User.query.get(int(user_id))
+    return User.query.get(int(user_id))
 
 
 # Routing
 
-@app.route('/')
+@app.route('/', endpoint='root')
+@login_required
 @app.route('/<path:element>')
+@login_required
 def view(element=""):
     path = os.path.realpath(os.path.join(app.config["FOLDER"], element))
     if (os.path.join(os.path.commonprefix((path, app.config["FOLDER"])), "") != app.config["FOLDER"]) \
@@ -31,7 +84,15 @@ def view(element=""):
         return abort(404)
 
     session["CSRF-TOKEN"] = secrets.token_hex()
-
+    if request.args.get("delete"):
+        location = request.args.get("location")
+        path = os.path.join(path, location)
+        logger.info('%s %s %s %s %s', session.get('username'), request.remote_addr, 'DELETE', path, 'OK')
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+        return redirect(request.url.split('?')[0])
     if os.path.isdir(path):
         return render_template("listing.template", element=get_element(path, not len(element)))
 
@@ -44,7 +105,118 @@ def view(element=""):
     return render_template("file.template", element=get_element(path))
 
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'GET':
+        if session.get('username') is not None:
+            logger.info('%s %s %s', session.get('username'), request.remote_addr, 'Login!')
+            return redirect(url_for('root'))
+        login_form = LoginFrom()
+        return render_template("login.template", form=login_form)
+    elif request.method == 'POST':
+        data = request.get_json()
+        username = data['username']
+        password = data['password']
+        app.logger.debug('user:%s try to login!' % username)
+        # 前端已加防范，后端再防一手
+        if username is None:
+            logger.warning('%s %s %s', request.remote_addr, 'Login', 'login with out username!')
+            return jsonify({
+                'code': 1,
+                'message': '请输入用户名',
+                'data': '', })
+        if password is None:
+            logger.warning('%s %s %s', request.remote_addr, 'Login', 'login with out password!')
+            return jsonify({
+                'code': 1,
+                'message': '请输入密码',
+                'data': '', })
+        user = User.query.filter_by(username=username).first()
+        if user:
+            if user.check_password(password):
+                user.is_login = True
+                user.last_login_ip = request.remote_addr
+                user.last_login_time = datetime.datetime.now()
+                db.session.add_all([user])
+                db.session.commit()
+                login_user(user)
+                session['username'] = username
+                logger.info('%s %s %s', session.get('username'), request.remote_addr, 'Login!')
+                return jsonify({
+                    'code': 0,
+                    'message': '登录成功！',
+                    'data': '',
+                })
+            else:
+                logger.warning('%s %s %s', request.remote_addr, 'Login', 'login with wrong password!')
+                return jsonify({
+                    'code': 1,
+                    'message': '用户名或密码错误！',
+                    'data': '',
+                })
+        else:
+            logger.warning('%s %s %s', request.remote_addr, 'Login', 'login with wrong username:%s!' % username)
+            return jsonify({
+                'code': 1,
+                'message': '用户名或密码错误！',
+                'data': '',
+            })
+    else:
+        return abort(405)
+
+
+@app.route('/logout', methods=['GET'])
+@login_required
+def logout():
+    username = session.get("username")
+    session.clear()
+    logout_user()
+    user = User.query.filter_by(username=username).first()
+    user.is_login = False
+    db.session.add(user)
+    db.session.commit()
+    logger.info('%s %s %s', request.remote_addr, 'Logout', 'logout with username:%s!' % username)
+    return redirect(url_for('login', next=request.url))
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'GET':
+        if session.get('username') is not None:
+            return redirect(url_for('root'))
+        form = RegFrom()
+        return render_template('register.template', form=form)
+    elif request.method == 'POST':
+        data = request.get_json()
+        username = data['username']
+        password = data['password']
+        se_password = data['se_password']
+        key = data['key']
+        logger.info('%s %s %s', request.remote_addr, 'Register', 'Try to register with username:%s!' % username)
+        if username is None:
+            return jsonify({'code': 1, 'message': '用户名不能为空！', 'data': '', })
+        if password is None:
+            return jsonify({'code': 1, 'message': '密码不能为空！', 'data': '', })
+        if password != se_password:
+            return jsonify({'code': 1, 'message': '两次密码不相同！', 'data': '', })
+        if key != conf.register_key:
+            return jsonify({'code': 1, 'message': '邀请码不正确！', 'data': '', })
+        user = User.query.filter_by(username=username).first()
+        if user:
+            return jsonify({'code': 1, 'message': '用户名已存在！', 'data': '', })
+        new_user = User(username=username)
+        new_user.set_password(password)
+        new_user.last_login_ip = request.remote_addr
+        db.session.add(new_user)
+        db.session.commit()
+        logger.info('%s %s %s', request.remote_addr, 'Register', 'Register success with username:%s!' % username)
+        return jsonify({'code': 0, 'message': '注册成功！', 'data': '', })
+    else:
+        return abort(405)
+
+
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload():
     if "CSRF-TOKEN" not in session:
         return {"status": False, "error": "Missing CSRF Token!"}
@@ -65,10 +237,12 @@ def upload():
 
     filename = secure_filename(file.filename)
     file.save(os.path.join(path, filename))
+    logger.info('%s %s %s %s', session.get('username'),request.remote_addr, 'Upload', os.path.join(path, filename))
     return {"status": True}
 
 
 @app.route('/zip', methods=['GET', 'POST'])
+@login_required
 def zip_utility():
     if "CSRF-TOKEN" not in session:
         return {"status": False, "error": "Missing CSRF Token!"}
@@ -186,8 +360,66 @@ def parse_archive_infolist(infolist, tar=False):
 # Output
 def after_request(response):
     timestamp = datetime.datetime.now().strftime('[%d-%m-%Y %H:%M:%S]')
-    logger.info('%s %s %s %s %s', timestamp, request.remote_addr, request.method, request.full_path, response.status)
+    logger.info('%s %s %s %s', request.remote_addr, request.method, request.full_path, response.status)
     return response
+
+
+# Form
+class LoginFrom(FlaskForm):
+    username = StringField(u'用户名',
+                           [validators.Length(min=4, max=16, message=u'用户名长度在4-16位'), validators.DataRequired()],
+                           render_kw={'placeholder': u'请输入用户名'})
+    password = PasswordField(u'密码', [validators.length(min=8, max=16, message=u'密码长度8-16位'), validators.DataRequired()],
+                             render_kw={'placeholder': u'请输入密码'})
+
+
+class RegFrom(Form):
+    username = StringField(u'注册用户名(请使用公司常用英文名)', [validators.Length(min=3, max=16, message=u'用户名长度在3-16位'),
+                                                  validators.DataRequired(message=u'请输入用户名')],
+                           render_kw={'placeholder': u'请输入用户名'})
+    password = PasswordField(u'注册密码', [validators.length(min=5, max=16, message=u'密码长度5-16位'),
+                                       validators.DataRequired(message=u'请输入密码')], render_kw={'placeholder': u'请输入密码'})
+    se_password = PasswordField(u'再次输入密码', [validators.length(min=5, max=16, message=u'密码长度5-16位'),
+                                            validators.DataRequired(message=u'请输入确认密码')],
+                                render_kw={'placeholder': u'请输入密码'})
+    key = StringField(u'输入邀请码', validators=[validators.DataRequired(message=u'请输入邀请码')],
+                      render_kw={'placeholder': u'输入邀请码'})
+
+
+# database
+
+class User(db.Model):  # 用户表
+    __tablename__ = 'users'
+    id = db.Column(db.Integer(), primary_key=True, autoincrement=True)
+    username = db.Column(db.String(63), unique=True)
+    password = db.Column(db.String(252))
+    last_login_ip = db.Column(db.String(15))
+    last_login_time = db.Column(db.DateTime(), default=datetime.datetime.now())
+    is_login = db.Column(db.Boolean(), default=False)
+
+    def __repr__(self):
+        return self.username
+
+    def set_password(self, password):
+        # self.password = generate_password_hash(password)
+        self.password = password
+
+    def check_password(self, password):
+        # return True
+        return self.password == password
+        # return check_password_hash(self.password, password)
+
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return True
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return self.id
 
 
 # Main

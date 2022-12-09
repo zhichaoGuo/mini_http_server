@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css"
+              rel="stylesheet"
+              integrity="sha384-gH2yIJqKdNHPEq0n4Mqa/HGKIhSkIHeL5AyhkYV8i59U5AR6csBvApHHNl/vI1Bx"
+              crossorigin="anonymous">
+
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css">
+
+        <title>fm.htek.com Login</title>
+</head>
+<body onkeydown="KeyDown();">
+    <div class="container px-4 py-2">
+    <header>
+        <div class="row mb-2 justify-content-around text-center">
+            <div class="col-lg-3">
+            <div style="text-align: center;color: red">
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        <ul class=flashes>
+                            {% for message in messages %}
+                                <li><strong>{{ message }}</strong></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            </div>
+            <div class="col-lg-6">
+                <div class="header " style="">
+                <br>
+                <h1 style="text-align: center;"> </h1>
+                <h1 style="text-align: center;">fm.htek.com</h1>
+                <h2 style="text-align: center;">Login</h2>
+                <h6 style="text-align: center;">_______________________________________________________________</h6>
+            </div>
+            <div style="text-align: center;color: red" id="duanyan">※</div>
+            <br>
+            </div>
+            <div class="col-lg-3">
+                <div class="p-2 mx-auto text-center text-break" style="max-width: 85%">
+                 <div aria-live="polite" aria-atomic="true" class="d-flex justify-content-center align-items-center w-100">
+                    <div id="liveToast" class="toast align-items-center" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                            已复制链接.
+                            </div>
+                        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="">
+        <form name ="loginform" class="form-auth-small" method="POST" style="width: 40%;margin-left: 30%;">
+            {{ form.hidden_tag() }}
+            <div class="form-group">
+                {% if form.username.errors %}
+                    {% for e in form.username.errors %}
+                        <p class="flashes">{{ e }}</p>
+                    {% endfor %}
+                {% endif %}
+                {{ form.username(class='form-control',id='username') }}
+                <br>
+                <div class="form-group">
+                    {{ form.password(class='form-control',id='password') }}
+                </div>
+                <br>
+                <div class="d-grid gap-2 col-6 mx-auto">
+                <button name = "btnsubmit"  type="button" class="btn btn-outline-dark" onclick="login()">登录</button>
+                <button name = "btnregister"  type="button" class="btn btn-outline-dark" onclick="register()">注册</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+<script type="text/javascript">
+    function login() {
+        var username = document.getElementById('username').value;
+        var password = document.getElementById('password').value;
+        var message = document.getElementById('duanyan');
+        if (username.length < 1) {
+            message.innerHTML = "用户名不能为空！";
+        } else {
+            if (password.length < 1) {
+                message.innerHTML = "密码不能为空！";
+            } else {
+                var data = {};
+                data['username'] = username;
+                data['password'] = password;
+                fetch("/login", {
+                    method: "POST",
+                    headers: {'Content-Type': 'application/json;charset=UTF-8'},
+                    body: JSON.stringify(data)
+                })
+                .then(
+                    resp => resp.json()
+                )
+                .then((resp) => {
+                    if (resp.code==0) {
+                        sleep(300); //等待session加载
+                        window.location.href = '{{ url_for('root') }}';
+                    } else
+                        message.innerHTML = resp.message
+                })
+                .catch((err) => {
+                    alert("Error: " + err)
+                })
+            }
+        }
+    }
+    function KeyDown(){
+        if (event.keyCode == 13){
+            event.returnValue=false;
+            event.cancel = true;
+            loginform.btnsubmit.click();
+        }
+    }
+    function register() {
+        location.href = '{{ url_for('register') }}';
+    }
+    function sleep(delay) {
+        var start = (new Date()).getTime();
+        while((new Date()).getTime() - start < delay) {
+            continue;
+    }
+}
+</script>
+</html>

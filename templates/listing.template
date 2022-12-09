@@ -19,10 +19,14 @@
     {% for item in element.children %}
     <li class="list-group-item list-group-item-action d-flex flex-column flex-lg-row py-1" data-name="{{ item.name }}" title="{{ item.path }}">
         <div class="flex-grow-1 text-break">
+            <i class="bi bi-share"></i>
             <i class="bi {{ "bi-folder-fill" if item.isdir else get_icon(item) }} me-2" style="font-size:1.2rem;"></i>
             {{ item.name }}
         </div>
-        <em class="my-auto text-end text-muted" style="font-size: 0.93rem">{{ item.mtime|datetime_humanize }} • {{ item.size|filesizeformat }}</em>
+        <em class="my-auto text-end text-muted" style="font-size: 0.93rem">{{ item.mtime|datetime_humanize }} • {{ item.size|filesizeformat }}
+        <i class="bi {{ "bi-folder-x" if item.isdir else "bi-trash" }}"></i>
+        </em>
+
     </li>
     {% endfor %}
 </ul>
