@@ -17,7 +17,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from wtforms import StringField, PasswordField, validators, Form
 
-from http_server.config import Config
+from config import Config
 
 app = Flask(__name__)
 app.config.update(
@@ -28,16 +28,15 @@ conf = Config()
 # -------------  setting logger   -----------------
 logger = logging.getLogger("http.server")
 logger.setLevel(logging.WARNING)
-formatter = logging.Formatter("[%(asctime)s][%(module)s:%(lineno)d][%(levelname)s][%(thread)d] - %(message)s")
-handler = TimedRotatingFileHandler("./log/flask.log", when="D", interval=1, backupCount=15, encoding="UTF-8",
+formatter = logging.Formatter(conf.log_format)
+handler = TimedRotatingFileHandler(conf.log_path, when="D", interval=1, backupCount=15, encoding="UTF-8",
                                    delay=False, utc=True)
-
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-app.secret_key = 'Htek20180905'
+app.secret_key = conf.secret_key
 
 # -------------  setting database  -----------------
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:HtekRPS2017@127.0.0.1:3306/http'
+app.config['SQLALCHEMY_DATABASE_URI'] = conf.sql_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db = SQLAlchemy(app)
 ctx = app.app_context()
