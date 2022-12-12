@@ -127,7 +127,7 @@
             if (event.target.className == "bi bi-share"){
                 location = event.target.parentElement.parentElement.attributes["data-name"].value;
                 var oInput = document.createElement("input");
-                oInput.value = "http://fm.htek.com" + window.location.pathname.replace(/\/+$/, "") + "/" + location;
+                oInput.value = "http://fm.http.com" + window.location.pathname.replace(/\/+$/, "") + "/" + location;
                 document.body.appendChild(oInput);
                 oInput.select(); // 选择对象
                 document.execCommand("Copy"); // 执行浏览器复制命令

@@ -11,7 +11,7 @@
 
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css">
 
-        <title>fm.htek.com Login</title>
+        <title>fm.http.com Login</title>
 </head>
 <body onkeydown="KeyDown();">
     <div class="container px-4 py-2">
@@ -35,7 +35,7 @@
                 <div class="header " style="">
                 <br>
                 <h1 style="text-align: center;"> </h1>
-                <h1 style="text-align: center;">fm.htek.com</h1>
+                <h1 style="text-align: center;">fm.http.com</h1>
                 <h2 style="text-align: center;">Login</h2>
                 <h6 style="text-align: center;">_______________________________________________________________</h6>
             </div>
